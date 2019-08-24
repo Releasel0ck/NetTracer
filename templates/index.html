@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{.title}}</title>
+  <link rel="stylesheet" href="statics/css/style.css">
+  <link rel="stylesheet" href="statics/css/bootstrap.min.css" >
+  <link rel="stylesheet" href="statics/css/jquery.qtip.css">
+  <link rel="stylesheet" href="statics/css/bootstrap-toggle.min.css" >
+  <link rel="stylesheet" href="statics/css/font-awesome.min.css">
+  <link rel="stylesheet" href="statics/css/bootstrap-datetimepicker.css">
+ <script src="statics/js/jquery.min.js"></script>
+ <script src="statics/js/moment.min.js"></script>
+  <script src="statics/js/bootstrap-toggle.min.js"></script>
+  <script src="statics/js/bootstrap.min.js" ></script>
+  <script src="statics/js/bootstrap-datetimepicker.min.js" ></script>
+  <script src="statics/js/script2.js"></script>
+  <script src="statics/js/vis-network.min.js"></script>
+  <link href="statics/css/vis-network.min.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+  <nav class="navbar navbar-default">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#"><img src="statics/images/logo_top.svg" alt="top" width="190" style="margin-top: -5px"></a>
+      <div class="collapse navbar-collapse">
+        <form class="navbar-form navbar-left" role="search">
+          <div class="form-group">
+            <label class="sr-only" for="InputSelect">select</label>
+            <select class="form-control" id="InputSelect">
+			<option>Port</option>  
+			<option>ServiceIP</option>
+			<option>ClientIP</option>
+            <option>IPAddress</option>        
+            </select>
+            <input class="form-control" type="text" value="" id="query-input" size="30">
+            <div id="itemForm"></div>
+          </div>
+          <button id="search_button" type="button" class="btn btn-default" data-toggle="tooltip" data-placement="bottom" >search</button>         
+        </form>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-sm-2 col-md-2 sidebar">  
+           <a style="text-decoration:none">Current Project:</a>&nbsp;<span id="CurrentProject" style="color:red"></span><br><br>
+            <select class="form-control" id="ProjectSelect">
+				      
+            </select>
+			<br>
+			<button id="SelectButton" type="button" class="btn btn-default"  >Select</button>
+			 
+			<hr>
+			<a style="text-decoration:none">Create Project:</a><br><br>	
+			<input   class="form-control"  type="text" value="" id="NewProjectName" size="20">
+			<br>
+			 <button id="CreateButton" type="button" class="btn btn-default">Create</button>
+			 <hr>
+			<a style="text-decoration:none" data-toggle="tooltip" data-placement="bottom" data-original-title="Import Netstat File.">Upload</a><br><br>
+			<button class="btn btn-default" data-toggle="modal" data-target="#UploadNF" onclick="clearLastResult()">Upload Netstat File</button>
+      </div>
+	  
+      <div class="col-sm-8 col-md-8 main">    
+         <div id="error"></div>
+		<div id="mynetwork" style="height:650px;"></div>
+      </div>
+	  
+      <div class="col-sm-2 col-md-2">
+        <div class="container" id="rankPort"></div>
+        <hr>
+        <div class="container" id="rankHost"></div>
+      </div>
+	  
+	</div>
+  
+  <div class="modal fade" id="UploadNF" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal"><span class="glyphicon glyphicon-remove"></span></button>
+          <h4 class="modal-title">Upload Netstat File</h4>
+          <p>Upload a File containing the output of netstat results.</p>
+        </div>
+        <div class="modal-body">
+          <div class="input-group">
+            <input multiple id="lefile" type="file" style="display:none">
+            <input type="text" id="NF_name" class="form-control" placeholder="select a file ...">
+            <span class="input-group-btn"><button type="button" class="btn btn-info" onclick="$('input[id=lefile]').click();">Browse</button></span>
+          </div>
+          <div id="uploadBar"></div>
+          <div id="status"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary" onclick="file_upload()">Upload</button>
+          <button type="button" class="btn btn-default" data-dismiss="modal">Close</button> 
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  
+  <div class="modal fade" id="warningMessage" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h4 class="modal-title">WARNING!</h4>
+        </div>
+        <div class="modal-body">
+          <p>Web page loading slow due to large graph. Do you want to continue searching?</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" onclick="contQuery()" data-dismiss="modal">Yes</button>
+          <button type="button" class="btn btn-primary" data-dismiss="modal">No</button>
+        </div>
+      </div>
+    </div>
+  </div>
+<script type="text/javascript">
+  window.onload=getDatabase();
+   window.onload=getPortAndIPRank();
+   
+    $.post("/getCurrentDatabase","",function(data){ 
+	 document.getElementById("CurrentProject").innerHTML = data;  
+    });
+	
+	$("#CreateButton").click(function(){
+	dbn=$("#NewProjectName").val()
+	if (dbn==""){
+	alert("Please enter the database name first!");
+	return;
+	}
+	    $.post("/createDatabase",dbn,function(data){ 
+	    if(data=="ok"){
+		alert("create success!");
+		}else{
+		alert("create failed!");
+		}
+    });
+	getDatabase();
+	});
+	
+  var container = document.getElementById('mynetwork');
+  var dot = 'dinetwork {node[shape=circle]; 1 -> 1 -> 2; 2 -> 3; 2 -- 4; 2 -> 1 }';
+  var data = vis.network.convertDot(dot);
+  var network = new vis.Network(container, data); 
+</script>
+
+<script type="text/javascript">
+
+$("#search_button").click(function(){
+cn=document.getElementById('CurrentProject').innerHTML;
+if(cn==""){
+alert("Please connect to the database first!");
+}else{
+var select =$("#InputSelect").val();
+var value=$("#query-input").val();
+var queryvalue=select+":"+value.trim();
+    $.post("/query",queryvalue,function(data){
+		  var options = {
+       nodes:{
+	   chosen:{
+                node: function(values, id, selected, hovering){              
+                },
+
+            }
+	   }
+      };
+	  if (data=="null"){
+	  searchError();
+	  return;
+	  }
+	  
+  var container = document.getElementById('mynetwork');
+  var dot = data;
+  var data = vis.network.convertDot(dot);
+  var network = new vis.Network(container, data,options);
+    });
+	}
+});
+
+
+$('input[id=lefile]').change(function() {
+      var inFile = "";
+      var fileList = document.getElementById("lefile").files;
+      if (1 < fileList.length) {
+        inFile += "selected " + fileList.length + " files."
+      } else {
+        inFile += fileList[0].name
+      }
+      $('#NF_name').val(inFile.replace("C:\\fakepath\\", ""));
+    });
+
+	
+$("#SelectButton").click(function(){
+	db=$("#ProjectSelect").val();
+	    $.post("/selectDatabase",db,function(data){ 
+	     document.getElementById("CurrentProject").innerHTML = data;  
+		 getPortAndIPRank();
+    });	
+	}
+	);
+	
+ 
+
+</script>
+</body>
+
+</html>
